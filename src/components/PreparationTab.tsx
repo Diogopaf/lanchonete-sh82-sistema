@@ -89,7 +89,7 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:bg-muted"
-                onClick={backButtonAction}
+                onClick={(e) => { e.stopPropagation(); backButtonAction?.(); }}
                 title="Mover para etapa anterior"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -160,7 +160,6 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
 
   return (
     <div className="space-y-6">
-      {/* Toggle and Export Buttons */}
       {completedOrders.length > 0 && (
         <div className="flex justify-end gap-2">
           <Button
@@ -181,8 +180,7 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
         </div>
       )}
 
-      {/* Table View for Completed Orders */}
-      {showTableView && completedOrders.length > 0 && (
+      {showTableView && completedOrders.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -244,80 +242,101 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
             </Table>
           </CardContent>
         </Card>
-      )}
-
-      {/* Kanban View */}
-      {!showTableView && (
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Pending Orders */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Clock className="h-6 w-6 text-amber-500" />
-          <h2 className="text-2xl font-bold">Pendentes</h2>
-          <span className="bg-amber-500 text-white rounded-full px-3 py-1 text-sm font-bold">
-            {pendingOrders.length}
-          </span>
-        </div>
-        {pendingOrders.length === 0 ? (
-          <Card className="border-2 border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Nenhum pedido pendente
-            </CardContent>
-          </Card>
-        ) : (
-           pendingOrders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              showButton
-              buttonText="Iniciar Preparação"
-              buttonAction={() => handleStartPreparation(order.id)}
-              icon={Clock}
-              iconColor="text-amber-500"
-              showPaymentButton
-            />
-          ))
-        )}
-      </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="h-6 w-6 text-amber-500" />
+              <h2 className="text-2xl font-bold">Pendentes</h2>
+              <span className="bg-amber-500 text-white rounded-full px-3 py-1 text-sm font-bold">
+                {pendingOrders.length}
+              </span>
+            </div>
+            {pendingOrders.length === 0 ? (
+              <Card className="border-2 border-dashed">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Nenhum pedido pendente
+                </CardContent>
+              </Card>
+            ) : (
+              pendingOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  showButton
+                  buttonText="Iniciar Preparação"
+                  buttonAction={() => handleStartPreparation(order.id)}
+                  icon={Clock}
+                  iconColor="text-amber-500"
+                  showPaymentButton
+                />
+              ))
+            )}
+          </div>
 
-      {/* Preparing Orders */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Package className="h-6 w-6 text-blue-500" />
-          <h2 className="text-2xl font-bold">Em Preparação</h2>
-          <span className="bg-blue-500 text-white rounded-full px-3 py-1 text-sm font-bold">
-            {preparingOrders.length}
-          </span>
-        </div>
-        {preparingOrders.length === 0 ? (
-          <Card className="border-2 border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Nenhum pedido em preparação
-            </CardContent>
-          </Card>
-        ) : (
-           preparingOrders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              showButton
-              buttonText="Concluir Pedido"
-              buttonAction={() => handleCompleteOrder(order.id)}
-              icon={Package}
-              iconColor="text-blue-500"
-              showPaymentButton
-              showBackButton
-              backButtonAction={() => handleMoveBack(order.id, "preparing")}
-            />
-          ))
-        )}
-      </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="h-6 w-6 text-blue-500" />
+              <h2 className="text-2xl font-bold">Em Preparação</h2>
+              <span className="bg-blue-500 text-white rounded-full px-3 py-1 text-sm font-bold">
+                {preparingOrders.length}
+              </span>
+            </div>
+            {preparingOrders.length === 0 ? (
+              <Card className="border-2 border-dashed">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Nenhum pedido em preparação
+                </CardContent>
+              </Card>
+            ) : (
+              preparingOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  showButton
+                  buttonText="Concluir Pedido"
+                  buttonAction={() => handleCompleteOrder(order.id)}
+                  icon={Package}
+                  iconColor="text-blue-500"
+                  showPaymentButton
+                  showBackButton
+                  backButtonAction={() => handleMoveBack(order.id, "preparing")}
+                />
+              ))
+            )}
+          </div>
 
-      {/* Completed Orders */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <CheckCircle2 className="h-6 w-6 text-green-500" />
-          <h2 className="text-2xl font-bold">Concluídos</h2>
-          <span className="bg-green-500 text-white rounded-full px-3 py-1 text-sm font-bold">
-            {completedOrders.length}
-          </span>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle2 className="h-6 w-6 text-green-500" />
+              <h2 className="text-2xl font-bold">Concluídos</h2>
+              <span className="bg-green-500 text-white rounded-full px-3 py-1 text-sm font-bold">
+                {completedOrders.length}
+              </span>
+            </div>
+            {completedOrders.length === 0 ? (
+              <Card className="border-2 border-dashed">
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Nenhum pedido concluído
+                </CardContent>
+              </Card>
+            ) : (
+              completedOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  icon={CheckCircle2}
+                  iconColor="text-green-500"
+                  showBackButton
+                  backButtonAction={() => handleMoveBack(order.id, "completed")}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PreparationTab;
