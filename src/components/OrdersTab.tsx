@@ -9,9 +9,10 @@ import { toast } from "sonner";
 import { useSound } from "@/hooks/use-sound";
 import type { MenuItem, Order } from "@/pages/Index";
 
+// NOVO: A interface de props agora espera um pedido SEM o ID
 interface OrdersTabProps {
   menuItems: MenuItem[];
-  onAddOrder: (order: Order) => void;
+  onAddOrder: (order: Omit<Order, "id">) => void;
 }
 
 const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
@@ -69,8 +70,8 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
       return;
     }
 
-    const newOrder: Order = {
-      id: Date.now().toString(),
+    // NOVO: Este objeto agora é do tipo Omit<Order, "id"> e não tem a propriedade 'id'
+    const newOrder: Omit<Order, "id"> = {
       items: orderItems,
       total: calculateTotal(),
       status: "pending",

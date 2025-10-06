@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UtensilsCrossed, ClipboardPen, BookOpen } from "lucide-react";
 import logo from "@/assets/logo.png";
@@ -6,6 +6,20 @@ import logoSecondary from "@/assets/logo-secondary.png";
 import OrdersTab from "@/components/OrdersTab";
 import PreparationTab from "@/components/PreparationTab";
 import MenuTab from "@/components/MenuTab";
+import { db } from "../firebase";
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  writeBatch,
+  Timestamp,
+  query,
+  orderBy,
+} from "firebase/firestore";
+import { toast } from "sonner";
 
 export interface MenuItem {
   id: string;
@@ -27,92 +41,115 @@ export interface Order {
 }
 
 const Index = () => {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    {
-      id: "1",
-      name: "X-Burger Clássico",
-      description: "Hambúrguer, queijo, alface, tomate e molho especial",
-      price: 18.5,
-      stock: 50,
-      visible: true,
-    },
-    {
-      id: "2",
-      name: "X-Bacon",
-      description: "Hambúrguer, bacon, queijo, alface e tomate",
-      price: 22.0,
-      stock: 40,
-      visible: true,
-    },
-    {
-      id: "3",
-      name: "Hot Dog Completo",
-      description: "Salsicha, purê, batata palha, milho, ervilha e molhos",
-      price: 12.0,
-      stock: 60,
-      visible: true,
-    },
-    {
-      id: "4",
-      name: "Refrigerante Lata",
-      description: "Coca-Cola, Guaraná ou Fanta",
-      price: 5.0,
-      stock: 100,
-      visible: true,
-    },
-    {
-      id: "5",
-      name: "Batata Frita",
-      description: "Porção grande com molho",
-      price: 15.0,
-      stock: 35,
-      visible: true,
-    },
-  ]);
-
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
 
-  const addOrder = (newOrder: Order) => {
-    // Update stock for all items in the order at once
-    setMenuItems(menuItems.map((menuItem) => {
-      const orderItem = newOrder.items.find(item => item.menuItem.id === menuItem.id);
-      if (orderItem) {
-        return { ...menuItem, stock: menuItem.stock - orderItem.quantity };
-      }
-      return menuItem;
-    }));
-    
-    setOrders([...orders, newOrder]);
-  };
+  useEffect(() => {
+    const menuQuery = query(collection(db, "menuItems"), orderBy("name"));
+    const unsubscribeMenu = onSnapshot(menuQuery, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id,
+      })) as MenuItem[];
+      setMenuItems(items);
+    });
 
-  const updateOrderStatus = (orderId: string, status: Order["status"]) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, status } : order)));
-  };
+    const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
+      const loadedOrders = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id,
+          createdAt: (data.createdAt as Timestamp).toDate(),
+        } as Order;
+      });
+      setOrders(loadedOrders);
+    });
 
-  const updateOrderPayment = (orderId: string, isPaid: boolean) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, isPaid } : order)));
-  };
-
-  const updateMenuItem = (updatedItem: MenuItem) => {
-    setMenuItems(menuItems.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
-  };
-
-  const deleteMenuItem = (itemId: string) => {
-    setMenuItems(menuItems.filter((item) => item.id !== itemId));
-  };
-
-  const addMenuItem = (newItem: Omit<MenuItem, "id">) => {
-    const item: MenuItem = {
-      ...newItem,
-      id: Date.now().toString(),
-      visible: true,
+    return () => {
+      unsubscribeMenu();
+      unsubscribeOrders();
     };
-    setMenuItems([...menuItems, item]);
+  }, []);
+
+  const addOrder = async (newOrder: Omit<Order, "id">) => {
+    try {
+      const batch = writeBatch(db);
+      
+      const ordersCollectionRef = collection(db, "orders");
+      const newOrderRef = doc(ordersCollectionRef); 
+      batch.set(newOrderRef, {
+        ...newOrder,
+        createdAt: Timestamp.fromDate(newOrder.createdAt),
+      });
+
+      for (const item of newOrder.items) {
+        const menuItemRef = doc(db, "menuItems", item.menuItem.id);
+        const newStock = item.menuItem.stock - item.quantity;
+        batch.update(menuItemRef, { stock: newStock });
+      }
+      
+      await batch.commit();
+    } catch (error) {
+      console.error("Erro ao adicionar pedido:", error);
+      toast.error("Falha ao criar o pedido. Tente novamente.");
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status: Order["status"]) => {
+    try {
+      const orderRef = doc(db, "orders", orderId);
+      await updateDoc(orderRef, { status });
+    } catch (error) {
+      console.error("Erro ao atualizar status do pedido:", error);
+      toast.error("Falha ao atualizar o status. Tente novamente.");
+    }
+  };
+
+  const updateOrderPayment = async (orderId: string, isPaid: boolean) => {
+    try {
+      const orderRef = doc(db, "orders", orderId);
+      await updateDoc(orderRef, { isPaid });
+    } catch (error) {
+      console.error("Erro ao atualizar pagamento:", error);
+      toast.error("Falha ao atualizar o pagamento. Tente novamente.");
+    }
+  };
+
+  const updateMenuItem = async (updatedItem: MenuItem) => {
+    try {
+      const { id, ...itemData } = updatedItem;
+      const menuItemRef = doc(db, "menuItems", id);
+      await updateDoc(menuItemRef, itemData);
+    } catch (error) {
+      console.error("Erro ao atualizar item do cardápio:", error);
+      toast.error("Falha ao atualizar o item. Tente novamente.");
+    }
+  };
+
+  const deleteMenuItem = async (itemId: string) => {
+    try {
+      const menuItemRef = doc(db, "menuItems", itemId);
+      await deleteDoc(menuItemRef);
+    } catch (error) {
+      console.error("Erro ao deletar item do cardápio:", error);
+      toast.error("Falha ao deletar o item. Tente novamente.");
+    }
+  };
+
+  const addMenuItem = async (newItem: Omit<MenuItem, "id">) => {
+    try {
+      const menuCollectionRef = collection(db, "menuItems");
+      await addDoc(menuCollectionRef, newItem);
+    } catch (error) {
+      console.error("Erro ao adicionar item do cardápio:", error);
+      toast.error("Falha ao adicionar o item. Tente novamente.");
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b-4 border-primary bg-card shadow-lg">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between gap-4">
@@ -128,7 +165,6 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="w-full">
           <div className="flex justify-center mb-8">
