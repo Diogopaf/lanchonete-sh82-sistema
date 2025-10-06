@@ -2,16 +2,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// TODO: Adicione aqui as chaves de configuração do seu projeto Firebase
-// COLE AQUI O SEU OBJETO firebaseConfig
+// As chaves agora são lidas das variáveis de ambiente (.env)
+// import.meta.env é como o Vite nos dá acesso a elas.
 const firebaseConfig = {
-  apiKey: "AIzaSyCmsHMyBSOyxXWYk8Z1DD4FqnGvdlyLm0I",
-  authDomain: "sh82-sistema.firebaseapp.com",
-  projectId: "sh82-sistema",
-  storageBucket: "sh82-sistema.firebasestorage.app",
-  messagingSenderId: "937690200475",
-  appId: "1:937690200475:web:b0a0ccf8ae86650255c93e",
-  measurementId: "G-LVZEXD5JB0"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREASS_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 
