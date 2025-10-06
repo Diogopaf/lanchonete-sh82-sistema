@@ -1,11 +1,7 @@
-// ESTE É UM TESTE PARA O GIT
-import { Button } from "@/components/ui/button";
-// ... o resto do código
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, Package, Download, Table as TableIcon } from "lucide-react";
+import { CheckCircle2, Clock, Package, Download, Table as TableIcon, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useSound } from "@/hooks/use-sound";
 import type { Order } from "@/pages/Index";
@@ -67,7 +63,13 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
     toast.success("Pedido marcado como pago!");
   };
 
-  const OrderCard = ({ order, showButton, buttonText, buttonAction, icon: Icon, iconColor, showPaymentButton }: {
+  const handleMoveBack = (orderId: string, currentStatus: Order["status"]) => {
+    const previousStatus = currentStatus === "preparing" ? "pending" : "preparing";
+    onUpdateStatus(orderId, previousStatus);
+    toast.info(`Pedido movido para a etapa anterior.`);
+  };
+
+  const OrderCard = ({ order, showButton, buttonText, buttonAction, icon: Icon, iconColor, showPaymentButton, showBackButton, backButtonAction }: {
     order: Order;
     showButton?: boolean;
     buttonText?: string;
@@ -75,14 +77,29 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
     icon: any;
     iconColor: string;
     showPaymentButton?: boolean;
+    showBackButton?: boolean;
+    backButtonAction?: () => void;
   }) => (
     <Card className="border-2 hover:shadow-lg transition-all">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Icon className={`h-5 w-5 ${iconColor}`} />
-            Pedido #{order.id.slice(-4)}
-          </CardTitle>
+           <div className="flex items-center gap-2">
+            {showBackButton && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:bg-muted"
+                onClick={backButtonAction}
+                title="Mover para etapa anterior"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <CardTitle className="text-base flex items-center gap-2">
+              <Icon className={`h-5 w-5 ${iconColor}`} />
+              Pedido #{order.id.slice(-4)}
+            </CardTitle>
+          </div>
           <span className="text-xs text-muted-foreground">
             {order.createdAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
           </span>
@@ -289,6 +306,8 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
               icon={Package}
               iconColor="text-blue-500"
               showPaymentButton
+              showBackButton
+              backButtonAction={() => handleMoveBack(order.id, "preparing")}
             />
           ))
         )}
@@ -302,28 +321,3 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
           <span className="bg-green-500 text-white rounded-full px-3 py-1 text-sm font-bold">
             {completedOrders.length}
           </span>
-        </div>
-        {completedOrders.length === 0 ? (
-          <Card className="border-2 border-dashed">
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Nenhum pedido concluído
-            </CardContent>
-          </Card>
-        ) : (
-          completedOrders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              icon={CheckCircle2}
-              iconColor="text-green-500"
-            />
-          ))
-        )}
-      </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default PreparationTab;
