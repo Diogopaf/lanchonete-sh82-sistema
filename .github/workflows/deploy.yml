@@ -4,8 +4,10 @@ name: Deploy to GitHub Pages
 # Gatilho: Este fluxo de trabalho roda toda vez que houver um 'push' para a branch 'main'
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
+  
+  # Permite que você rode este workflow manualmente pela aba Actions
+  workflow_dispatch:
 
 # Permissões necessárias para que a Action possa publicar no GitHub Pages
 permissions:
@@ -13,13 +15,18 @@ permissions:
   pages: write
   id-token: write
 
+# Previne que múltiplos workflows rodem ao mesmo tempo
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 # Tarefas a serem executadas
 jobs:
   deploy:
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
     steps:
       # 1. Baixa o código do seu repositório
       - name: Checkout
@@ -29,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
           cache: 'npm'
 
       # 3. Instala as dependências do projeto
@@ -46,18 +53,14 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-
-      # 5. Configura o GitHub Pages
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      # 6. Faz o upload dos artefatos (a pasta 'dist')
+      
+      # 5. Faz o upload dos artefatos (a pasta 'dist') para o GitHub Pages
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
 
-      # 7. Publica no GitHub Pages
+      # 6. Publica no GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
