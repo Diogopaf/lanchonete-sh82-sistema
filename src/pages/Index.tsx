@@ -52,6 +52,9 @@ const Index = () => {
         id: doc.id,
       })) as MenuItem[];
       setMenuItems(items);
+    }, (error) => { // NOVO: Tratamento de erro para o listener
+      console.error("Erro ao buscar itens do cardápio:", error);
+      toast.error("Não foi possível carregar o cardápio.");
     });
 
     const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"));
@@ -65,6 +68,9 @@ const Index = () => {
         } as Order;
       });
       setOrders(loadedOrders);
+    }, (error) => { // NOVO: Tratamento de erro para o listener
+      console.error("Erro ao buscar pedidos:", error);
+      toast.error("Não foi possível carregar os pedidos.");
     });
 
     return () => {
@@ -73,7 +79,8 @@ const Index = () => {
     };
   }, []);
 
-  const addOrder = async (newOrder: Omit<Order, "id">) => {
+  // NOVO: A função agora retorna uma Promise<boolean> (verdadeiro ou falso)
+  const addOrder = async (newOrder: Omit<Order, "id">): Promise<boolean> => {
     try {
       const batch = writeBatch(db);
       
@@ -91,9 +98,11 @@ const Index = () => {
       }
       
       await batch.commit();
+      return true; // Retorna true em caso de sucesso
     } catch (error) {
       console.error("Erro ao adicionar pedido:", error);
-      toast.error("Falha ao criar o pedido. Tente novamente.");
+      toast.error("Falha ao criar o pedido. Verifique sua conexão e tente novamente.");
+      return false; // Retorna false em caso de erro
     }
   };
 

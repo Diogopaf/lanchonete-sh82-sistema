@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Minus, ShoppingCart } from "lucide-react";
@@ -9,10 +8,10 @@ import { toast } from "sonner";
 import { useSound } from "@/hooks/use-sound";
 import type { MenuItem, Order } from "@/pages/Index";
 
-// NOVO: A interface de props agora espera um pedido SEM o ID
+// NOVO: A função onAddOrder agora retorna uma "Promessa" de que a operação vai terminar
 interface OrdersTabProps {
   menuItems: MenuItem[];
-  onAddOrder: (order: Omit<Order, "id">) => void;
+  onAddOrder: (order: Omit<Order, "id">) => Promise<boolean>;
 }
 
 const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
@@ -64,13 +63,13 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
     return orderItems.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
   };
 
-  const handleSubmitOrder = () => {
+  // NOVO: A função agora é "async" para poder "esperar" (await) pela resposta
+  const handleSubmitOrder = async () => {
     if (orderItems.length === 0) {
       toast.error("Adicione itens ao pedido!");
       return;
     }
 
-    // NOVO: Este objeto agora é do tipo Omit<Order, "id"> e não tem a propriedade 'id'
     const newOrder: Omit<Order, "id"> = {
       items: orderItems,
       total: calculateTotal(),
@@ -80,12 +79,17 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
       isPaid,
     };
 
-    onAddOrder(newOrder);
-    playNewOrderSound();
-    setOrderItems([]);
-    setObservation("");
-    setIsPaid(false);
-    toast.success("Pedido criado com sucesso!");
+    // NOVO: "Esperamos" a função onAddOrder terminar e nos dizer se deu certo (true) ou errado (false)
+    const success = await onAddOrder(newOrder);
+
+    // NOVO: Só limpamos o formulário e mostramos a mensagem de sucesso se a operação for bem-sucedida
+    if (success) {
+      playNewOrderSound();
+      setOrderItems([]);
+      setObservation("");
+      setIsPaid(false);
+      toast.success("Pedido criado com sucesso!");
+    }
   };
 
   return (
