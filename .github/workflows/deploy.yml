@@ -23,9 +23,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # MUDANÇA ABAIXO: Usamos 'npx vite build' em vez de 'npm run build'
+      # NOVO PASSO: Força as permissões de execução na pasta de pacotes
+      - name: Add execute permission to node_modules
+        run: chmod -R +x node_modules/.bin
+
       - name: Build project
-        run: npx vite build
+        run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -37,7 +40,5 @@ jobs:
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
-          # Token de acesso que permite à Action fazer push para a branch gh-pages
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # O diretório que contém os arquivos de produção (a pasta 'dist')
           publish_dir: ./dist
