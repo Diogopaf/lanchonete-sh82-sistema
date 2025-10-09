@@ -1,50 +1,29 @@
 # Nome do fluxo de trabalho
-name: Deploy to GitHub Pages
+name: Deploy via gh-pages package
 
-# Gatilho: Este fluxo de trabalho roda toda vez que houver um 'push' para a branch 'main'
 on:
   push:
-    branches: ["main"]
-  
-  # Permite que você rode este workflow manualmente pela aba Actions
+    branches:
+      - main
   workflow_dispatch:
 
-# Permissões necessárias para que a Action possa publicar no GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Previne que múltiplos workflows rodem ao mesmo tempo
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-
-# Tarefas a serem executadas
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. Baixa o código do seu repositório
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configura o ambiente Node.js
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      # 3. Instala as dependências do projeto
       - name: Install dependencies
         run: npm install
 
-      # 4. Constrói o site, injetando os segredos como variáveis de ambiente
-      - name: Build
+      - name: Build project
         run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -53,14 +32,11 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-      
-      # 5. Faz o upload dos artefatos (a pasta 'dist') para o GitHub Pages
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './dist'
 
-      # 6. Publica no GitHub Pages
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          # Token de acesso que permite à Action fazer push para a branch gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # O diretório que contém os arquivos de produção (a pasta 'dist')
+          publish_dir: ./dist
