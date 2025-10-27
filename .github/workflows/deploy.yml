@@ -23,10 +23,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # NOVO PASSO: Força as permissões de execução na pasta de pacotes
-      - name: Add execute permission to node_modules
-        run: chmod -R +x node_modules/.bin
-
       - name: Build project
         run: npm run build
         env:
@@ -40,5 +36,9 @@ jobs:
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # MUDANÇA AQUI: Usamos o novo token pessoal em vez do token padrão
+          personal_token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
           publish_dir: ./dist
+          # Adiciona uma configuração de usuário para o commit do deploy
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
