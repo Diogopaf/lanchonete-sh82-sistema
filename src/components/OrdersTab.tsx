@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { useSound } from "@/hooks/use-sound";
 import type { MenuItem, Order } from "@/pages/Index";
 
-// NOVO: A função onAddOrder agora retorna uma "Promessa" de que a operação vai terminar
 interface OrdersTabProps {
   menuItems: MenuItem[];
   onAddOrder: (order: Omit<Order, "id">) => Promise<boolean>;
@@ -63,26 +62,26 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
     return orderItems.reduce((sum, item) => sum + item.menuItem.price * item.quantity, 0);
   };
 
-  // NOVO: A função agora é "async" para poder "esperar" (await) pela resposta
   const handleSubmitOrder = async () => {
     if (orderItems.length === 0) {
       toast.error("Adicione itens ao pedido!");
       return;
     }
 
+    // CORREÇÃO AQUI: Usamos "" em vez de undefined para observação vazia
+    const observationValue = observation.trim();
+
     const newOrder: Omit<Order, "id"> = {
       items: orderItems,
       total: calculateTotal(),
       status: "pending",
       createdAt: new Date(),
-      observation: observation.trim() || undefined,
+      observation: observationValue, // Agora envia "" se estiver vazio
       isPaid,
     };
 
-    // NOVO: "Esperamos" a função onAddOrder terminar e nos dizer se deu certo (true) ou errado (false)
     const success = await onAddOrder(newOrder);
 
-    // NOVO: Só limpamos o formulário e mostramos a mensagem de sucesso se a operação for bem-sucedida
     if (success) {
       playNewOrderSound();
       setOrderItems([]);
