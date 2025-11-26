@@ -17,8 +17,9 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 20 15% 20%;
 
-    --primary: 16 69% 58%;
-    --primary-foreground: 35 60% 95%;
+    /* Alterado: Identidade Visual para Preto */
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 35 50% 85%;
     --secondary-foreground: 20 15% 20%;
@@ -26,30 +27,41 @@ All colors MUST be HSL.
     --muted: 35 40% 90%;
     --muted-foreground: 20 10% 45%;
 
-    --accent: 16 69% 58%;
-    --accent-foreground: 35 60% 95%;
+    /* Alterado: Accent segue o preto */
+    --accent: 0 0% 0%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 35 60% 95%;
 
     --border: 35 30% 85%;
     --input: 35 30% 85%;
-    --ring: 16 69% 58%;
+    
+    /* Alterado: Ring segue o preto */
+    --ring: 0 0% 0%;
 
     --radius: 1rem;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 20 15% 20%;
-    --sidebar-primary: 16 69% 58%;
-    --sidebar-primary-foreground: 35 60% 95%;
+    
+    /* Alterado: Sidebar segue o preto */
+    --sidebar-primary: 0 0% 0%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    
     --sidebar-accent: 35 50% 90%;
     --sidebar-accent-foreground: 20 15% 20%;
     --sidebar-border: 35 30% 85%;
-    --sidebar-ring: 16 69% 58%;
     
-    --gradient-primary: linear-gradient(135deg, hsl(16 69% 58%), hsl(16 80% 65%));
+    /* Alterado */
+    --sidebar-ring: 0 0% 0%;
+    
+    /* Gradiente ajustado para tons de preto/cinza */
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 0%), hsl(0 0% 25%));
     --gradient-subtle: linear-gradient(180deg, hsl(35 60% 95%), hsl(35 50% 90%));
-    --shadow-coral: 0 10px 30px -10px hsl(16 69% 58% / 0.3);
+    
+    /* Sombra ajustada para preto */
+    --shadow-coral: 0 10px 30px -10px hsl(0 0% 0% / 0.3);
   }
 
   .dark {
@@ -62,8 +74,9 @@ All colors MUST be HSL.
     --popover: 20 20% 15%;
     --popover-foreground: 35 60% 95%;
 
-    --primary: 16 69% 58%;
-    --primary-foreground: 35 60% 95%;
+    /* No modo dark, usamos Branco para destacar */
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
 
     --secondary: 20 20% 20%;
     --secondary-foreground: 35 60% 95%;
@@ -71,28 +84,28 @@ All colors MUST be HSL.
     --muted: 20 20% 20%;
     --muted-foreground: 35 20% 65%;
 
-    --accent: 16 69% 58%;
-    --accent-foreground: 35 60% 95%;
+    --accent: 0 0% 100%;
+    --accent-foreground: 0 0% 0%;
 
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 35 60% 95%;
 
     --border: 20 20% 25%;
     --input: 20 20% 25%;
-    --ring: 16 69% 58%;
+    --ring: 0 0% 100%;
     
     --sidebar-background: 20 20% 15%;
     --sidebar-foreground: 35 60% 95%;
-    --sidebar-primary: 16 69% 58%;
-    --sidebar-primary-foreground: 35 60% 95%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 0 0% 0%;
     --sidebar-accent: 20 20% 20%;
     --sidebar-accent-foreground: 35 60% 95%;
     --sidebar-border: 20 20% 25%;
-    --sidebar-ring: 16 69% 58%;
+    --sidebar-ring: 0 0% 100%;
     
-    --gradient-primary: linear-gradient(135deg, hsl(16 69% 58%), hsl(16 80% 65%));
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 75%));
     --gradient-subtle: linear-gradient(180deg, hsl(20 25% 12%), hsl(20 20% 15%));
-    --shadow-coral: 0 10px 30px -10px hsl(16 69% 58% / 0.4);
+    --shadow-coral: 0 10px 30px -10px hsl(0 0% 100% / 0.1);
   }
 }
 
