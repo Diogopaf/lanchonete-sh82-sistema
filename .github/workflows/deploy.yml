@@ -1,4 +1,3 @@
-# Nome do fluxo de trabalho
 name: Deploy via gh-pages package
 
 on:
@@ -23,6 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # ESTE É O PASSO QUE FALTAVA: Corrige a permissão do Vite
+      - name: Add execute permission to node_modules
+        run: chmod -R +x node_modules/.bin
+
       - name: Build project
         run: npm run build
         env:
@@ -36,9 +39,8 @@ jobs:
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
-          # MUDANÇA AQUI: Usamos o novo token pessoal em vez do token padrão
+          # Token pessoal para corrigir o erro de permissão no deploy
           personal_token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
           publish_dir: ./dist
-          # Adiciona uma configuração de usuário para o commit do deploy
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
