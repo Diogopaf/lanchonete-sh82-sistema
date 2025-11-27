@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Minus, ShoppingCart } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Plus, Minus, ShoppingCart, CreditCard, Banknote, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { useSound } from "@/hooks/use-sound";
 import type { MenuItem, Order } from "@/pages/Index";
@@ -17,6 +19,8 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
   const [orderItems, setOrderItems] = useState<{ menuItem: MenuItem; quantity: number }[]>([]);
   const [observation, setObservation] = useState("");
   const [isPaid, setIsPaid] = useState(false);
+  // NOVO: Estado para controlar o método de pagamento
+  const [paymentMethod, setPaymentMethod] = useState<Order["paymentMethod"]>("pix");
   const { playNewOrderSound } = useSound();
 
   const addItemToOrder = (menuItem: MenuItem) => {
@@ -68,7 +72,6 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
       return;
     }
 
-    // CORREÇÃO AQUI: Usamos "" em vez de undefined para observação vazia
     const observationValue = observation.trim();
 
     const newOrder: Omit<Order, "id"> = {
@@ -76,8 +79,9 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
       total: calculateTotal(),
       status: "pending",
       createdAt: new Date(),
-      observation: observationValue, // Agora envia "" se estiver vazio
+      observation: observationValue,
       isPaid,
+      paymentMethod, // NOVO: Enviando o método de pagamento
     };
 
     const success = await onAddOrder(newOrder);
@@ -87,6 +91,7 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
       setOrderItems([]);
       setObservation("");
       setIsPaid(false);
+      setPaymentMethod("pix"); // Reseta para o padrão
       toast.success("Pedido criado com sucesso!");
     }
   };
@@ -174,8 +179,44 @@ const OrdersTab = ({ menuItems, onAddOrder }: OrdersTabProps) => {
                 </div>
 
                 <div className="border-t-2 border-border pt-4 space-y-4">
+                  
+                  {/* NOVO: Seletor de Método de Pagamento */}
+                  <div className="space-y-2">
+                    <Label>Forma de Pagamento</Label>
+                    <Select
+                      value={paymentMethod}
+                      onValueChange={(value: Order["paymentMethod"]) => setPaymentMethod(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">
+                          <div className="flex items-center gap-2">
+                            <QrCode className="h-4 w-4" /> Pix
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="money">
+                          <div className="flex items-center gap-2">
+                            <Banknote className="h-4 w-4" /> Dinheiro
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="debit">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" /> Cartão de Débito
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="credit">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" /> Cartão de Crédito
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Observação</label>
+                    <Label className="mb-2 block">Observação</Label>
                     <Textarea
                       placeholder="Ex: Sem cebola, sem molho..."
                       value={observation}

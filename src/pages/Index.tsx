@@ -38,6 +38,7 @@ export interface Order {
   createdAt: Date;
   observation?: string;
   isPaid: boolean;
+  paymentMethod: "pix" | "money" | "credit" | "debit"; // NOVO CAMPO
 }
 
 const Index = () => {
@@ -52,7 +53,7 @@ const Index = () => {
         id: doc.id,
       })) as MenuItem[];
       setMenuItems(items);
-    }, (error) => { // NOVO: Tratamento de erro para o listener
+    }, (error) => {
       console.error("Erro ao buscar itens do cardápio:", error);
       toast.error("Não foi possível carregar o cardápio.");
     });
@@ -68,7 +69,7 @@ const Index = () => {
         } as Order;
       });
       setOrders(loadedOrders);
-    }, (error) => { // NOVO: Tratamento de erro para o listener
+    }, (error) => {
       console.error("Erro ao buscar pedidos:", error);
       toast.error("Não foi possível carregar os pedidos.");
     });
@@ -79,7 +80,6 @@ const Index = () => {
     };
   }, []);
 
-  // NOVO: A função agora retorna uma Promise<boolean> (verdadeiro ou falso)
   const addOrder = async (newOrder: Omit<Order, "id">): Promise<boolean> => {
     try {
       const batch = writeBatch(db);
@@ -98,11 +98,11 @@ const Index = () => {
       }
       
       await batch.commit();
-      return true; // Retorna true em caso de sucesso
+      return true;
     } catch (error) {
       console.error("Erro ao adicionar pedido:", error);
       toast.error("Falha ao criar o pedido. Verifique sua conexão e tente novamente.");
-      return false; // Retorna false em caso de erro
+      return false;
     }
   };
 
