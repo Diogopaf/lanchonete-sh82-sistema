@@ -1,32 +1,91 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, Package, Download, Table as TableIcon, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { CheckCircle2, Clock, Package, Download, Table as TableIcon, ArrowLeft, Search, Calendar, Filter, X, Pencil, QrCode, Banknote, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { useSound } from "@/hooks/use-sound";
 import type { Order } from "@/pages/Index";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useState } from "react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 
 interface PreparationTabProps {
   orders: Order[];
   onUpdateStatus: (orderId: string, status: Order["status"]) => void;
-  onUpdatePayment: (orderId: string, isPaid: boolean) => void;
+  onUpdatePayment: (orderId: string, isPaid: boolean, paymentMethod?: Order["paymentMethod"]) => void;
 }
 
 const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: PreparationTabProps) => {
   const { playOrderCompletedSound } = useSound();
   const [showTableView, setShowTableView] = useState(false);
+  
+  // Estados para os filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
+
+  // Estados para o Modal de Pagamento
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState<Order | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<Order["paymentMethod"]>("pix");
+
   const pendingOrders = orders.filter((order) => order.status === "pending");
   const preparingOrders = orders.filter((order) => order.status === "preparing");
   const completedOrders = orders.filter((order) => order.status === "completed");
 
+  const filteredCompletedOrders = completedOrders.filter((order) => {
+    const matchesSearch = 
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.items.some(item => item.menuItem.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesPayment = paymentFilter === "all" || order.paymentMethod === paymentFilter;
+
+    let matchesDate = true;
+    const orderDate = new Date(order.createdAt);
+    orderDate.setHours(0, 0, 0, 0);
+    const orderTime = orderDate.getTime();
+
+    if (dateStart) {
+      const [y, m, d] = dateStart.split('-').map(Number);
+      const startDate = new Date(y, m - 1, d);
+      startDate.setHours(0, 0, 0, 0);
+      matchesDate = matchesDate && orderTime >= startDate.getTime();
+    }
+
+    if (dateEnd) {
+      const [y, m, d] = dateEnd.split('-').map(Number);
+      const endDate = new Date(y, m - 1, d);
+      endDate.setHours(0, 0, 0, 0);
+      matchesDate = matchesDate && orderTime <= endDate.getTime();
+    }
+
+    return matchesSearch && matchesPayment && matchesDate;
+  });
+
+  const totalAmount = filteredCompletedOrders.reduce((acc, order) => acc + order.total, 0);
+
+  const translatePayment = (method: string) => {
+    const map: Record<string, string> = {
+      pix: "Pix",
+      money: "Dinheiro",
+      credit: "Crédito",
+      debit: "Débito"
+    };
+    return map[method] || method;
+  };
+
   const exportToCSV = () => {
-    const headers = ["Pedido", "Horário", "Itens", "Total", "Status Pagamento"];
-    const rows = completedOrders.map(order => [
+    const headers = ["Pedido", "Data", "Horário", "Itens", "Método Pgto", "Total", "Status Pagamento"];
+    const rows = filteredCompletedOrders.map(order => [
       `#${order.id.slice(-4)}`,
-      order.createdAt.toLocaleString("pt-BR"),
+      order.createdAt.toLocaleDateString("pt-BR"),
+      order.createdAt.toLocaleTimeString("pt-BR"),
       order.items.map(item => `${item.quantity}x ${item.menuItem.name}`).join("; "),
+      translatePayment(order.paymentMethod || "pix"),
       `R$ ${order.total.toFixed(2)}`,
       order.isPaid ? "Pago" : "Pendente"
     ]);
@@ -40,11 +99,11 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `pedidos_concluidos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `relatorio_vendas_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success("Dados exportados com sucesso!");
+    toast.success("Relatório exportado com sucesso!");
   };
 
   const handleStartPreparation = (orderId: string) => {
@@ -58,15 +117,33 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
     toast.success("Pedido concluído!");
   };
 
-  const handleMarkAsPaid = (orderId: string) => {
-    onUpdatePayment(orderId, true);
-    toast.success("Pedido marcado como pago!");
-  };
-
   const handleMoveBack = (orderId: string, currentStatus: Order["status"]) => {
     const previousStatus = currentStatus === "preparing" ? "pending" : "preparing";
     onUpdateStatus(orderId, previousStatus);
     toast.info(`Pedido movido para a etapa anterior.`);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setPaymentFilter("all");
+    setDateStart("");
+    setDateEnd("");
+  };
+
+  // FUNÇÕES PARA O MODAL DE PAGAMENTO
+  const openPaymentDialog = (order: Order) => {
+    setSelectedOrderForPayment(order);
+    setSelectedPaymentMethod(order.paymentMethod || "pix"); // Carrega o método atual ou pix
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleConfirmPayment = () => {
+    if (selectedOrderForPayment) {
+      onUpdatePayment(selectedOrderForPayment.id, true, selectedPaymentMethod);
+      toast.success("Pagamento registrado!");
+      setIsPaymentDialogOpen(false);
+      setSelectedOrderForPayment(null);
+    }
   };
 
   const OrderCard = ({ order, showButton, buttonText, buttonAction, icon: Icon, iconColor, showPaymentButton, showBackButton, backButtonAction }: {
@@ -100,9 +177,14 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
               Pedido #{order.id.slice(-4)}
             </CardTitle>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {order.createdAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-          </span>
+          <div className="flex flex-col items-end">
+            <span className="text-xs font-bold text-muted-foreground">
+              {translatePayment(order.paymentMethod || "pix")}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {order.createdAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -133,17 +215,33 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
           </div>
           
           <div className="flex items-center justify-between gap-2">
-            <Badge variant={order.isPaid ? "default" : "secondary"} className="font-semibold">
+            <Badge 
+              variant={order.isPaid ? "default" : "secondary"} 
+              className={`font-semibold ${order.isPaid ? "bg-green-600 hover:bg-green-700" : ""}`}
+            >
               {order.isPaid ? "✓ Pago" : "Pendente"}
             </Badge>
-            {!order.isPaid && showPaymentButton && (
+            
+            {/* Botão de Pagar ou Editar Pagamento */}
+            {!order.isPaid && showPaymentButton ? (
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => handleMarkAsPaid(order.id)}
+                onClick={() => openPaymentDialog(order)}
                 className="text-xs"
               >
-                Marcar como Pago
+                Pagar
+              </Button>
+            ) : (
+              // Botão discreto para editar pagamento se já estiver pago
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 text-muted-foreground hover:text-primary"
+                title="Alterar forma de pagamento"
+                onClick={() => openPaymentDialog(order)}
+              >
+                <Pencil className="h-3 w-3" />
               </Button>
             )}
           </div>
@@ -160,24 +258,80 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
 
   return (
     <div className="space-y-6">
-      {completedOrders.length > 0 && (
-        <div className="flex justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowTableView(!showTableView)}
-            className="gap-2"
-          >
-            <TableIcon className="h-4 w-4" />
-            {showTableView ? "Ver Cards" : "Ver Tabela"}
-          </Button>
-          <Button
-            onClick={exportToCSV}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Exportar CSV
-          </Button>
-        </div>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <h2 className="text-2xl font-bold hidden sm:block">Gerenciamento</h2>
+        {completedOrders.length > 0 && (
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setShowTableView(!showTableView)}
+              className="gap-2 flex-1 sm:flex-none"
+            >
+              <TableIcon className="h-4 w-4" />
+              {showTableView ? "Ver Cards" : "Ver Relatório"}
+            </Button>
+            {showTableView && (
+              <Button
+                onClick={exportToCSV}
+                className="gap-2 flex-1 sm:flex-none"
+              >
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showTableView && (
+        <Card className="bg-muted/30">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Search className="h-4 w-4" /> Buscar Pedido/Produto
+                </label>
+                <Input 
+                  placeholder="Ex: Coxinha ou #1234" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Filter className="h-4 w-4" /> Pagamento
+                </label>
+                <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="money">Dinheiro</SelectItem>
+                    <SelectItem value="credit">Crédito</SelectItem>
+                    <SelectItem value="debit">Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> De
+                </label>
+                <Input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> Até
+                </label>
+                <Input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} />
+              </div>
+              <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4 mr-2" /> Limpar Filtros
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {showTableView && completedOrders.length > 0 ? (
@@ -185,61 +339,78 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-6 w-6 text-green-500" />
-              Pedidos Concluídos - Visualização em Tabela
+              Histórico de Vendas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Horário</TableHead>
-                  <TableHead>Itens</TableHead>
-                  <TableHead>Observação</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Pagamento</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {completedOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">#{order.id.slice(-4)}</TableCell>
-                    <TableCell>
-                      {order.createdAt.toLocaleString("pt-BR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit"
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="text-sm">
-                            {item.quantity}x {item.menuItem.name}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Data/Hora</TableHead>
+                    <TableHead>Itens</TableHead>
+                    <TableHead>Pagamento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCompletedOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                        Nenhum pedido encontrado com esses filtros.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCompletedOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">#{order.id.slice(-4)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span>{order.createdAt.toLocaleDateString("pt-BR")}</span>
+                            <span className="text-xs text-muted-foreground">{order.createdAt.toLocaleTimeString("pt-BR")}</span>
                           </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {order.observation ? (
-                        <div className="text-sm max-w-xs">{order.observation}</div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-bold">
-                      R$ {order.total.toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={order.isPaid ? "default" : "secondary"}>
-                        {order.isPaid ? "✓ Pago" : "Pendente"}
-                      </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="text-sm">
+                                <span className="font-bold">{item.quantity}x</span> {item.menuItem.name}
+                              </div>
+                            ))}
+                            {order.observation && (
+                              <span className="text-xs text-muted-foreground italic">Obs: {order.observation}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {translatePayment(order.paymentMethod || "pix")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={order.isPaid ? "default" : "destructive"}>
+                            {order.isPaid ? "Pago" : "Pendente"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          R$ {order.total.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={5} className="font-bold text-lg">Total do Período</TableCell>
+                    <TableCell className="text-right font-bold text-lg text-primary">
+                      R$ {totalAmount.toFixed(2)}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableFooter>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -335,6 +506,58 @@ const PreparationTab = ({ orders, onUpdateStatus, onUpdatePayment }: Preparation
           </div>
         </div>
       )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE PAGAMENTO */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="payment-method">Selecione a forma de pagamento</Label>
+              <Select
+                value={selectedPaymentMethod}
+                onValueChange={(value: Order["paymentMethod"]) => setSelectedPaymentMethod(value)}
+              >
+                <SelectTrigger id="payment-method">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pix">
+                    <div className="flex items-center gap-2">
+                      <QrCode className="h-4 w-4" /> Pix
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="money">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4" /> Dinheiro
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="debit">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" /> Cartão de Débito
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="credit">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" /> Cartão de Crédito
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmPayment}>
+              Confirmar Pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

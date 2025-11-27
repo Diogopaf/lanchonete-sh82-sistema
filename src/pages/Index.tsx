@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UtensilsCrossed, ClipboardPen, BookOpen } from "lucide-react";
+import { UtensilsCrossed, ClipboardPen, BookOpen, LayoutDashboard } from "lucide-react";
 import logo from "@/assets/logo.png";
 import logoSecondary from "@/assets/logo-secondary.png";
 import OrdersTab from "@/components/OrdersTab";
 import PreparationTab from "@/components/PreparationTab";
 import MenuTab from "@/components/MenuTab";
+import DashboardTab from "@/components/DashboardTab";
 import { db } from "../firebase";
 import {
   collection,
@@ -38,7 +39,7 @@ export interface Order {
   createdAt: Date;
   observation?: string;
   isPaid: boolean;
-  paymentMethod: "pix" | "money" | "credit" | "debit"; // NOVO CAMPO
+  paymentMethod: "pix" | "money" | "credit" | "debit";
 }
 
 const Index = () => {
@@ -116,10 +117,15 @@ const Index = () => {
     }
   };
 
-  const updateOrderPayment = async (orderId: string, isPaid: boolean) => {
+  // MUDANÇA AQUI: Agora aceita o método de pagamento opcionalmente
+  const updateOrderPayment = async (orderId: string, isPaid: boolean, paymentMethod?: Order["paymentMethod"]) => {
     try {
       const orderRef = doc(db, "orders", orderId);
-      await updateDoc(orderRef, { isPaid });
+      const updateData: any = { isPaid };
+      if (paymentMethod) {
+        updateData.paymentMethod = paymentMethod;
+      }
+      await updateDoc(orderRef, updateData);
     } catch (error) {
       console.error("Erro ao atualizar pagamento:", error);
       toast.error("Falha ao atualizar o pagamento. Tente novamente.");
@@ -176,7 +182,7 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="orders" className="w-full">
-          <div className="flex justify-center mb-8">
+          <div className="flex justify-center mb-8 overflow-x-auto pb-2">
             <TabsList>
               <TabsTrigger value="orders" className="gap-2">
                 <ClipboardPen className="h-4 w-4" />
@@ -189,6 +195,10 @@ const Index = () => {
               <TabsTrigger value="menu" className="gap-2">
                 <BookOpen className="h-4 w-4" />
                 Cardápio
+              </TabsTrigger>
+              <TabsTrigger value="dashboard" className="gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
               </TabsTrigger>
             </TabsList>
           </div>
@@ -208,6 +218,10 @@ const Index = () => {
               onDeleteItem={deleteMenuItem}
               onAddItem={addMenuItem}
             />
+          </TabsContent>
+
+          <TabsContent value="dashboard">
+            <DashboardTab orders={orders} />
           </TabsContent>
         </Tabs>
       </main>
