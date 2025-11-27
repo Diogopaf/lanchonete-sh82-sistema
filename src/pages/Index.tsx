@@ -27,6 +27,7 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
+  costPrice: number; // Preço de Custo Médio
   stock: number;
   visible: boolean;
 }
@@ -84,7 +85,6 @@ const Index = () => {
   const addOrder = async (newOrder: Omit<Order, "id">): Promise<boolean> => {
     try {
       const batch = writeBatch(db);
-      
       const ordersCollectionRef = collection(db, "orders");
       const newOrderRef = doc(ordersCollectionRef); 
       batch.set(newOrderRef, {
@@ -95,6 +95,7 @@ const Index = () => {
       for (const item of newOrder.items) {
         const menuItemRef = doc(db, "menuItems", item.menuItem.id);
         const newStock = item.menuItem.stock - item.quantity;
+        // Nota: Venda não altera o preço de custo, apenas baixa o estoque
         batch.update(menuItemRef, { stock: newStock });
       }
       
@@ -102,7 +103,7 @@ const Index = () => {
       return true;
     } catch (error) {
       console.error("Erro ao adicionar pedido:", error);
-      toast.error("Falha ao criar o pedido. Verifique sua conexão e tente novamente.");
+      toast.error("Falha ao criar o pedido.");
       return false;
     }
   };
@@ -112,23 +113,20 @@ const Index = () => {
       const orderRef = doc(db, "orders", orderId);
       await updateDoc(orderRef, { status });
     } catch (error) {
-      console.error("Erro ao atualizar status do pedido:", error);
-      toast.error("Falha ao atualizar o status. Tente novamente.");
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Falha ao atualizar status.");
     }
   };
 
-  // MUDANÇA AQUI: Agora aceita o método de pagamento opcionalmente
   const updateOrderPayment = async (orderId: string, isPaid: boolean, paymentMethod?: Order["paymentMethod"]) => {
     try {
       const orderRef = doc(db, "orders", orderId);
       const updateData: any = { isPaid };
-      if (paymentMethod) {
-        updateData.paymentMethod = paymentMethod;
-      }
+      if (paymentMethod) updateData.paymentMethod = paymentMethod;
       await updateDoc(orderRef, updateData);
     } catch (error) {
       console.error("Erro ao atualizar pagamento:", error);
-      toast.error("Falha ao atualizar o pagamento. Tente novamente.");
+      toast.error("Falha ao atualizar pagamento.");
     }
   };
 
@@ -138,8 +136,8 @@ const Index = () => {
       const menuItemRef = doc(db, "menuItems", id);
       await updateDoc(menuItemRef, itemData);
     } catch (error) {
-      console.error("Erro ao atualizar item do cardápio:", error);
-      toast.error("Falha ao atualizar o item. Tente novamente.");
+      console.error("Erro ao atualizar item:", error);
+      toast.error("Falha ao atualizar item.");
     }
   };
 
@@ -148,8 +146,8 @@ const Index = () => {
       const menuItemRef = doc(db, "menuItems", itemId);
       await deleteDoc(menuItemRef);
     } catch (error) {
-      console.error("Erro ao deletar item do cardápio:", error);
-      toast.error("Falha ao deletar o item. Tente novamente.");
+      console.error("Erro ao deletar item:", error);
+      toast.error("Falha ao deletar item.");
     }
   };
 
@@ -158,8 +156,54 @@ const Index = () => {
       const menuCollectionRef = collection(db, "menuItems");
       await addDoc(menuCollectionRef, newItem);
     } catch (error) {
-      console.error("Erro ao adicionar item do cardápio:", error);
-      toast.error("Falha ao adicionar o item. Tente novamente.");
+      console.error("Erro ao adicionar item:", error);
+      toast.error("Falha ao adicionar item.");
+    }
+  };
+
+  // --- NOVA FUNÇÃO: ENTRADA DE ESTOQUE INTELIGENTE ---
+  const handleStockEntry = async (itemId: string, quantityAdded: number, newBatchCost: number) => {
+    try {
+      const item = menuItems.find(i => i.id === itemId);
+      if (!item) return;
+
+      // 1. Cálculo do Custo Médio Ponderado
+      const currentTotalValue = item.stock * (item.costPrice || 0);
+      const newBatchValue = quantityAdded * newBatchCost;
+      const newTotalStock = item.stock + quantityAdded;
+      
+      // Evita divisão por zero se o estoque for zero
+      const newAverageCost = newTotalStock > 0 
+        ? (currentTotalValue + newBatchValue) / newTotalStock 
+        : newBatchCost;
+
+      const batch = writeBatch(db);
+
+      // 2. Atualiza o Item (Estoque + Novo Custo)
+      const itemRef = doc(db, "menuItems", itemId);
+      batch.update(itemRef, {
+        stock: newTotalStock,
+        costPrice: newAverageCost
+      });
+
+      // 3. Cria o Registro Histórico (Log)
+      const logsRef = doc(collection(db, "stock_logs"));
+      batch.set(logsRef, {
+        itemId: itemId,
+        itemName: item.name,
+        type: "entry", // 'entry' = entrada
+        quantity: quantityAdded,
+        costPrice: newBatchCost, // Quanto custou ESSA remessa
+        newAverageCost: newAverageCost, // Como ficou o custo médio depois
+        createdAt: Timestamp.now()
+      });
+
+      await batch.commit();
+      toast.success("Estoque atualizado e registrado com sucesso!");
+
+    } catch (error) {
+      console.error("Erro na entrada de estoque:", error);
+      toast.error("Falha ao registrar entrada.");
     }
   };
 
@@ -194,7 +238,7 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="menu" className="gap-2">
                 <BookOpen className="h-4 w-4" />
-                Cardápio
+                Estoque & Cardápio
               </TabsTrigger>
               <TabsTrigger value="dashboard" className="gap-2">
                 <LayoutDashboard className="h-4 w-4" />
@@ -217,6 +261,7 @@ const Index = () => {
               onUpdateItem={updateMenuItem}
               onDeleteItem={deleteMenuItem}
               onAddItem={addMenuItem}
+              onStockEntry={handleStockEntry} // Passamos a nova função
             />
           </TabsContent>
 

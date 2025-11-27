@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input"; // IMPORTAÇÃO NOVA
+import { Input } from "@/components/ui/input";
 import { Order } from "@/pages/Index";
-import { DollarSign, ShoppingBag, TrendingUp, Calendar } from "lucide-react";
+import { DollarSign, ShoppingBag, TrendingUp, Calendar, Coins } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { Progress } from "@/components/ui/progress"; // Importação do componente de barra de progresso
 
 interface DashboardTabProps {
   orders: Order[];
@@ -12,28 +13,21 @@ interface DashboardTabProps {
 
 const DashboardTab = ({ orders }: DashboardTabProps) => {
   const [timeRange, setTimeRange] = useState("all");
-  const [customStart, setCustomStart] = useState(""); // NOVO
-  const [customEnd, setCustomEnd] = useState("");     // NOVO
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
   // Função para filtrar os pedidos com base no período selecionado
   const filteredOrders = orders.filter(order => {
-    // Primeiro, apenas pedidos concluídos contam para o dashboard
     if (order.status !== "completed") return false;
-
-    // Se o filtro for "todos", passa direto
     if (timeRange === "all") return true;
 
     const orderDate = new Date(order.createdAt);
     const today = new Date();
-    
-    // Zera as horas para comparar apenas os dias (Normalização)
     today.setHours(0, 0, 0, 0);
     orderDate.setHours(0, 0, 0, 0);
     const orderTime = orderDate.getTime();
 
-    if (timeRange === "today") {
-      return orderTime === today.getTime();
-    }
+    if (timeRange === "today") return orderTime === today.getTime();
 
     if (timeRange === "7days") {
       const sevenDaysAgo = new Date(today);
@@ -47,7 +41,6 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
       return orderDate >= thirtyDaysAgo;
     }
 
-    // LÓGICA NOVA PARA PERÍODO PERSONALIZADO
     if (timeRange === "custom") {
       let matchesStart = true;
       let matchesEnd = true;
@@ -72,10 +65,19 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
     return true;
   });
 
-  // 1. Cálculos Gerais (Usando os pedidos filtrados)
+  // 1. Cálculos Gerais
   const totalRevenue = filteredOrders.reduce((acc, order) => acc + order.total, 0);
   const totalOrders = filteredOrders.length;
   const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const totalProfit = filteredOrders.reduce((acc, order) => {
+    const orderProfit = order.items.reduce((itemAcc, item) => {
+      const cost = item.menuItem.costPrice || 0;
+      const price = item.menuItem.price;
+      return itemAcc + ((price - cost) * item.quantity);
+    }, 0);
+    return acc + orderProfit;
+  }, 0);
 
   // 2. Dados para Gráfico de Pagamento
   const paymentDataRaw = filteredOrders.reduce((acc, order) => {
@@ -114,7 +116,7 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
     total: dayDataRaw[day] || 0
   }));
 
-  // 4. Top Produtos
+  // 4. Top Produtos (Quantidade)
   const productDataRaw = filteredOrders.reduce((acc, order) => {
     order.items.forEach(item => {
       acc[item.menuItem.name] = (acc[item.menuItem.name] || 0) + item.quantity;
@@ -127,15 +129,28 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
     .slice(0, 5)
     .map(([name, quantity]) => ({ name, quantity }));
 
+  // NOVO: Lucratividade por Produto (Valor Monetário)
+  const productProfitRaw = filteredOrders.reduce((acc, order) => {
+    order.items.forEach(item => {
+      const cost = item.menuItem.costPrice || 0;
+      const profit = (item.menuItem.price - cost) * item.quantity;
+      acc[item.menuItem.name] = (acc[item.menuItem.name] || 0) + profit;
+    });
+    return acc;
+  }, {} as Record<string, number>);
+
+  const productProfits = Object.entries(productProfitRaw)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, profit]) => ({ name, profit }));
+
+  const maxProductProfit = productProfits.length > 0 ? productProfits[0].profit : 1;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <h2 className="text-2xl font-bold">Dashboard Gerencial</h2>
         
-        {/* ÁREA DE FILTROS */}
         <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
-          
-          {/* Inputs de Data (Só aparecem se "Personalizado" for selecionado) */}
           {timeRange === "custom" && (
             <div className="flex items-center gap-2 bg-white p-1 rounded-md border animate-in fade-in slide-in-from-right-4">
               <Input 
@@ -154,7 +169,6 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
             </div>
           )}
 
-          {/* Seletor de Período */}
           <div className="flex items-center gap-2 bg-white p-1 rounded-md border">
             <Calendar className="h-4 w-4 text-muted-foreground ml-2" />
             <Select value={timeRange} onValueChange={setTimeRange}>
@@ -165,7 +179,7 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
                 <SelectItem value="today">Hoje</SelectItem>
                 <SelectItem value="7days">Últimos 7 dias</SelectItem>
                 <SelectItem value="30days">Últimos 30 dias</SelectItem>
-                <SelectItem value="custom">Personalizado</SelectItem> {/* NOVA OPÇÃO */}
+                <SelectItem value="custom">Personalizado</SelectItem>
                 <SelectItem value="all">Todo o período</SelectItem>
               </SelectContent>
             </Select>
@@ -174,7 +188,7 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Faturamento</CardTitle>
@@ -185,6 +199,18 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
             <p className="text-xs text-muted-foreground">No período selecionado</p>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Lucro Estimado</CardTitle>
+            <Coins className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">R$ {totalProfit.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">Margem: {totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0}%</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pedidos</CardTitle>
@@ -208,7 +234,6 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* Gráfico de Vendas por Dia */}
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Vendas por Dia da Semana</CardTitle>
@@ -216,31 +241,15 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
           <CardContent className="pl-2">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={dayData}>
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#888888" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
-                />
-                <YAxis 
-                  stroke="#888888" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
-                  tickFormatter={(value) => `R$${value}`} 
-                />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                />
+                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} />
+                <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Bar dataKey="total" fill="currentColor" radius={[4, 4, 0, 0]} className="fill-primary" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Gráfico de Métodos de Pagamento */}
         <Card className="col-span-3">
           <CardHeader>
             <CardTitle>Métodos de Pagamento</CardTitle>
@@ -248,15 +257,7 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie
-                  data={paymentData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
+                <Pie data={paymentData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                   {paymentData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -269,35 +270,60 @@ const DashboardTab = ({ orders }: DashboardTabProps) => {
         </Card>
       </div>
 
-      {/* Lista de Top Produtos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Produtos Mais Vendidos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {topProducts.map((product, index) => (
-              <div key={index} className="flex items-center">
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold mr-4">
-                  {index + 1}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Top Produtos por Volume */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Produtos Mais Vendidos (Volume)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {topProducts.map((product, index) => (
+                <div key={index} className="flex items-center">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold mr-4">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-medium leading-none">{product.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {product.quantity} unidades vendidas
+                    </p>
+                  </div>
+                  <div className="font-bold text-sm">
+                    {product.quantity} un
+                  </div>
                 </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">{product.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {product.quantity} unidades vendidas
-                  </p>
+              ))}
+              {topProducts.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhum dado de venda neste período.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* NOVO: Lucratividade por Produto */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lucratividade por Produto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-5">
+              {productProfits.slice(0, 5).map((product, index) => (
+                <div key={index} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{product.name}</span>
+                    <span className="text-green-600 font-semibold">R$ {product.profit.toFixed(2)}</span>
+                  </div>
+                  <Progress value={(product.profit / maxProductProfit) * 100} className="h-2" />
                 </div>
-                <div className="font-bold">
-                  {(product.quantity / (filteredOrders.reduce((acc, o) => acc + o.items.reduce((iAcc, i) => iAcc + i.quantity, 0), 0) || 1) * 100).toFixed(0)}%
-                </div>
-              </div>
-            ))}
-            {topProducts.length === 0 && (
-              <p className="text-center text-muted-foreground py-4">Nenhum dado de venda neste período.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+              {productProfits.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">Nenhum dado de lucro neste período.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
