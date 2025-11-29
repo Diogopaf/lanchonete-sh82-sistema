@@ -1,3 +1,4 @@
+# Nome do fluxo de trabalho
 name: Deploy via gh-pages package
 
 on:
@@ -22,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # ESTE É O PASSO QUE FALTAVA: Corrige a permissão do Vite
+      # Permissão para o Vite rodar (Correção do Build)
       - name: Add execute permission to node_modules
         run: chmod -R +x node_modules/.bin
 
@@ -35,6 +36,11 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      # --- NOVO PASSO: CRIA O 404.html AUTOMATICAMENTE ---
+      - name: Create 404.html for GitHub Pages routing
+        run: cp dist/index.html dist/404.html
+      # ---------------------------------------------------
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
