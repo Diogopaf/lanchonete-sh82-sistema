@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UtensilsCrossed, ClipboardPen, BookOpen, LayoutDashboard } from "lucide-react";
+import { UtensilsCrossed, ClipboardPen, BookOpen, LayoutDashboard, Wallet } from "lucide-react"; // NOVO ÍCONE
 import logo from "@/assets/logo.png";
 import logoSecondary from "@/assets/logo-secondary.png";
 import OrdersTab from "@/components/OrdersTab";
 import PreparationTab from "@/components/PreparationTab";
 import MenuTab from "@/components/MenuTab";
 import DashboardTab from "@/components/DashboardTab";
+import FinanceTab from "@/components/FinanceTab"; // IMPORTAÇÃO NOVA
 import { db } from "../firebase";
 import {
   collection,
@@ -27,7 +28,7 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
-  costPrice: number; // Preço de Custo Médio
+  costPrice: number;
   stock: number;
   visible: boolean;
 }
@@ -85,6 +86,7 @@ const Index = () => {
   const addOrder = async (newOrder: Omit<Order, "id">): Promise<boolean> => {
     try {
       const batch = writeBatch(db);
+      
       const ordersCollectionRef = collection(db, "orders");
       const newOrderRef = doc(ordersCollectionRef); 
       batch.set(newOrderRef, {
@@ -95,7 +97,6 @@ const Index = () => {
       for (const item of newOrder.items) {
         const menuItemRef = doc(db, "menuItems", item.menuItem.id);
         const newStock = item.menuItem.stock - item.quantity;
-        // Nota: Venda não altera o preço de custo, apenas baixa o estoque
         batch.update(menuItemRef, { stock: newStock });
       }
       
@@ -103,7 +104,7 @@ const Index = () => {
       return true;
     } catch (error) {
       console.error("Erro ao adicionar pedido:", error);
-      toast.error("Falha ao criar o pedido.");
+      toast.error("Falha ao criar o pedido. Verifique sua conexão e tente novamente.");
       return false;
     }
   };
@@ -113,8 +114,8 @@ const Index = () => {
       const orderRef = doc(db, "orders", orderId);
       await updateDoc(orderRef, { status });
     } catch (error) {
-      console.error("Erro ao atualizar status:", error);
-      toast.error("Falha ao atualizar status.");
+      console.error("Erro ao atualizar status do pedido:", error);
+      toast.error("Falha ao atualizar o status. Tente novamente.");
     }
   };
 
@@ -122,11 +123,13 @@ const Index = () => {
     try {
       const orderRef = doc(db, "orders", orderId);
       const updateData: any = { isPaid };
-      if (paymentMethod) updateData.paymentMethod = paymentMethod;
+      if (paymentMethod) {
+        updateData.paymentMethod = paymentMethod;
+      }
       await updateDoc(orderRef, updateData);
     } catch (error) {
       console.error("Erro ao atualizar pagamento:", error);
-      toast.error("Falha ao atualizar pagamento.");
+      toast.error("Falha ao atualizar o pagamento. Tente novamente.");
     }
   };
 
@@ -136,8 +139,8 @@ const Index = () => {
       const menuItemRef = doc(db, "menuItems", id);
       await updateDoc(menuItemRef, itemData);
     } catch (error) {
-      console.error("Erro ao atualizar item:", error);
-      toast.error("Falha ao atualizar item.");
+      console.error("Erro ao atualizar item do cardápio:", error);
+      toast.error("Falha ao atualizar o item. Tente novamente.");
     }
   };
 
@@ -146,8 +149,8 @@ const Index = () => {
       const menuItemRef = doc(db, "menuItems", itemId);
       await deleteDoc(menuItemRef);
     } catch (error) {
-      console.error("Erro ao deletar item:", error);
-      toast.error("Falha ao deletar item.");
+      console.error("Erro ao deletar item do cardápio:", error);
+      toast.error("Falha ao deletar o item. Tente novamente.");
     }
   };
 
@@ -156,45 +159,40 @@ const Index = () => {
       const menuCollectionRef = collection(db, "menuItems");
       await addDoc(menuCollectionRef, newItem);
     } catch (error) {
-      console.error("Erro ao adicionar item:", error);
-      toast.error("Falha ao adicionar item.");
+      console.error("Erro ao adicionar item do cardápio:", error);
+      toast.error("Falha ao adicionar o item. Tente novamente.");
     }
   };
 
-  // --- NOVA FUNÇÃO: ENTRADA DE ESTOQUE INTELIGENTE ---
   const handleStockEntry = async (itemId: string, quantityAdded: number, newBatchCost: number) => {
     try {
       const item = menuItems.find(i => i.id === itemId);
       if (!item) return;
 
-      // 1. Cálculo do Custo Médio Ponderado
       const currentTotalValue = item.stock * (item.costPrice || 0);
       const newBatchValue = quantityAdded * newBatchCost;
       const newTotalStock = item.stock + quantityAdded;
       
-      // Evita divisão por zero se o estoque for zero
       const newAverageCost = newTotalStock > 0 
         ? (currentTotalValue + newBatchValue) / newTotalStock 
         : newBatchCost;
 
       const batch = writeBatch(db);
 
-      // 2. Atualiza o Item (Estoque + Novo Custo)
       const itemRef = doc(db, "menuItems", itemId);
       batch.update(itemRef, {
         stock: newTotalStock,
         costPrice: newAverageCost
       });
 
-      // 3. Cria o Registro Histórico (Log)
       const logsRef = doc(collection(db, "stock_logs"));
       batch.set(logsRef, {
         itemId: itemId,
         itemName: item.name,
-        type: "entry", // 'entry' = entrada
+        type: "entry",
         quantity: quantityAdded,
-        costPrice: newBatchCost, // Quanto custou ESSA remessa
-        newAverageCost: newAverageCost, // Como ficou o custo médio depois
+        costPrice: newBatchCost,
+        newAverageCost: newAverageCost,
         createdAt: Timestamp.now()
       });
 
@@ -238,7 +236,11 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="menu" className="gap-2">
                 <BookOpen className="h-4 w-4" />
-                Estoque & Cardápio
+                Estoque
+              </TabsTrigger>
+              <TabsTrigger value="finance" className="gap-2"> {/* NOVO BOTÃO */}
+                <Wallet className="h-4 w-4" />
+                Financeiro
               </TabsTrigger>
               <TabsTrigger value="dashboard" className="gap-2">
                 <LayoutDashboard className="h-4 w-4" />
@@ -261,8 +263,13 @@ const Index = () => {
               onUpdateItem={updateMenuItem}
               onDeleteItem={deleteMenuItem}
               onAddItem={addMenuItem}
-              onStockEntry={handleStockEntry} // Passamos a nova função
+              onStockEntry={handleStockEntry}
             />
+          </TabsContent>
+
+          {/* NOVA ABA DE CONTEÚDO */}
+          <TabsContent value="finance">
+            <FinanceTab orders={orders} />
           </TabsContent>
 
           <TabsContent value="dashboard">
